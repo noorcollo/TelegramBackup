@@ -1,11 +1,11 @@
 # 📡 TelegramBackup
 
-> **Auto-backup any folder on your PC directly to a Telegram group or channel.**  
-> New files are detected instantly and uploaded automatically — no cloud accounts, no subscriptions.
+> **Auto-backup any folder on your PC to Telegram, Google Drive, or both.**
+> New files are detected instantly and uploaded automatically, with optional Google Drive OAuth.
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-v3.0-00e5b0?style=flat-square)
+![Version](https://img.shields.io/badge/version-v4.0-00e5b0?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078d4?style=flat-square)
 ![Python](https://img.shields.io/badge/python-3.9%2B-3776ab?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
@@ -20,7 +20,9 @@
 | Feature | Description |
 |---|---|
 | 📁 **Multi-folder watching** | Watch as many folders as you want simultaneously |
-| 📤 **Auto upload** | New files are detected and uploaded to Telegram instantly |
+| 📤 **Auto upload** | New files are detected and uploaded instantly |
+| 🎯 **Two backup destinations** | Choose Telegram only, Google Drive only, or both |
+| ☁️ **Optional Google Drive** | OAuth-protected Drive uploads with a selectable destination folder |
 | 🗂️ **All file types** | Documents, images, videos, audio, archives, code, databases, executables |
 | 📶 **Speed graph** | Live animated upload speed chart (KB/s or MB/s) |
 | 📊 **Skip stats** | Tracks uploaded, skipped, oversized, errors, and duplicates separately |
@@ -29,9 +31,13 @@
 | 🔄 **Background mode** | Keeps backing up after you close the window |
 | 🔔 **System tray** | Minimize to the clock area, right-click to open or quit |
 | 🔁 **Duplicate prevention** | MD5 hash check — same file is never uploaded twice |
+| ⏸ **Pause / resume** | Safely pause active transfers while retaining the queue |
+| 📶 **Global bandwidth limiter** | Shared token-bucket limit across Telegram and Drive, including custom KB/s and MB/s values |
+| 🧾 **Queue and statistics** | Live destination-aware activity table plus daily, session, and all-time summaries |
+| 🛡️ **Reliability controls** | File stability checks, offline queue waiting, configurable retry settings, and health state |
 | ⏳ **Flood control** | Auto-waits when Telegram rate-limits, retries automatically |
 | 🖥️ **Machine ID** | Each installation is tagged — know which PC uploaded each file |
-| 🔧 **8-step wizard** | Guided first-time setup, skip it on future launches |
+| 🔧 **8-step wizard** | Guided first-time setup, including destination selection and Drive connection testing |
 
 ---
 
@@ -85,11 +91,20 @@ pip install -r requirements.txt
 python telegram_backup_v3.py
 ```
 
+The v4 interface keeps the original Tkinter desktop architecture and existing JSON files. New settings use safe defaults, so existing installations do not need to reconfigure Telegram or Google Drive.
+
 Or on Windows, just double-click:
-```
+
+```text
 Launch_TelegramBackup.bat
 ```
 The `.bat` file handles Python detection and package installation automatically.
+
+### v4 settings and compatibility
+
+The application continues to read and write the existing `%USERPROFILE%\\.tgbackup_v3_config.json`, Telegram history, Google Drive token, and Google Drive history files. Added settings are optional and default to conservative values: unlimited bandwidth, uploads paused while offline, a two-second stability check, notifications enabled, and a 30-second connectivity check interval. The new statistics file is `%USERPROFILE%\\.tgbackup_v4_stats.json` and is written at a throttled interval rather than on every UI refresh.
+
+The queue’s **Remove from queue** action removes only an application queue entry. It never deletes source files.
 
 ---
 
@@ -110,7 +125,7 @@ Step 3 → Paste your Bot Token (with live verification)
 Step 4 → Paste your Chat / Group ID
 Step 5 → Select folders to watch (add as many as you want)
 Step 6 → Choose file types (or select ALL)
-Step 7 → Configure system options (autostart, tray, background)
+Step 7 → Choose Telegram, Google Drive, or both; connect Drive and choose a folder; configure system options
 Step 8 → Review summary and launch
 ```
 
@@ -118,13 +133,26 @@ Settings are saved after the wizard — future launches go straight to the dashb
 
 ---
 
+## ☁️ Setting Up Google Drive Backup
+
+Google Drive is optional. You can use Telegram only, Google Drive only, or both destinations at the same time.
+
+1. In the [Google Cloud Console](https://console.cloud.google.com/), enable the Google Drive API.
+2. Configure the Google Auth platform and create a **Desktop app** OAuth client.
+3. Download the JSON file and keep it on your computer; do not commit it to GitHub.
+4. In TelegramBackup, open **Settings → Backup Destinations**, choose **Google Drive Backup**, and browse to the JSON file.
+5. Click **Connect & Test**, complete the Google authorization in your browser, and optionally create a `TelegramBackup` folder.
+6. Use the dashboard buttons to switch Telegram Backup and Google Drive Backup on or off. At least one destination must remain enabled.
+
+The app stores the local Google refresh token in your user profile. It does not place credentials in the source code or repository.
+
 ## ⚙️ Getting Your Telegram Credentials
 
 ### Bot Token
 1. Open Telegram → search **@BotFather**
 2. Send `/newbot`
 3. Follow the prompts (pick a name and username ending in `bot`)
-4. Copy the token — looks like: `1234567890:ABCDefGhIjKlMnOpQrStUvWxYz`
+4. Copy the token — looks like: `1234567890:REPLACE_WITH_BOT_TOKEN`
 
 ### Chat / Group ID
 1. Add your bot to your group/channel as a member
@@ -169,7 +197,10 @@ Select individual categories or enable **"Back up ALL file types"** to upload ev
 ```
 TelegramBackup/
 │
-├── telegram_backup_v3.py     # Main application (all-in-one)
+├── telegram_backup_v3.py     # Main application and existing Tkinter UI/engine
+├── drive_backup.py            # Existing optional Google Drive OAuth/uploader module
+├── bandwidth.py               # Shared token-bucket limiter and throttled reader
+├── tests/test_core.py         # Offline smoke tests for limiter and stability checks
 ├── Launch_TelegramBackup.bat # Windows launcher (auto-installs deps)
 ├── requirements.txt          # Python dependencies
 ├── .gitignore                # Excludes config/token files from git
@@ -191,7 +222,9 @@ These are created automatically on first run — **never commit them to Git**.
 | File | Location | Contains |
 |---|---|---|
 | `.tgbackup_v3_config.json` | `%USERPROFILE%\` | Token, chat ID, folder list, settings |
-| `.tgbackup_v3_history.json` | `%USERPROFILE%\` | MD5 hashes of uploaded files |
+| `.tgbackup_v3_history.json` | `%USERPROFILE%\` | MD5 hashes of Telegram uploads |
+| `.tgbackup_v3_drive_token.json` | `%USERPROFILE%\` | Local Google OAuth token cache |
+| `.tgbackup_v3_drive_history.json` | `%USERPROFILE%\` | Google Drive duplicate-prevention history |
 
 ---
 
@@ -207,10 +240,15 @@ pyinstaller --onefile --windowed --name TelegramBackup \
   --collect-all watchdog \
   --collect-all pystray \
   --collect-all PIL \
+  --hidden-import=drive_backup \
+  --collect-all googleapiclient \
+  --collect-all google_auth_oauthlib \
   telegram_backup_v3.py
 ```
 
 Output: `dist/TelegramBackup.exe`
+
+The build includes both destinations. Google Drive credentials and OAuth token files remain external and are entered locally on each computer.
 
 ---
 

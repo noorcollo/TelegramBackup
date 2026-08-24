@@ -51,7 +51,7 @@ Or just double-click **`Launch_TelegramBackup.bat`** — it does this automatica
 
 The token looks like this:
 ```
-1234567890:ABCDefGhIjKlMnOpQrStUvWxYz
+1234567890:REPLACE_WITH_BOT_TOKEN
 ```
 
 **Keep this token private. Anyone with this token can control your bot.**
@@ -86,7 +86,19 @@ The token looks like this:
 
 ---
 
-## Step 7 — Launch and Configure
+## Step 7 — Choose Backup Destinations and Configure
+
+TelegramBackup can use **Telegram only**, **Google Drive only**, or **both destinations simultaneously**. Enable at least one destination in the wizard.
+
+### Google Drive setup (optional)
+
+1. Open the [Google Cloud Console](https://console.cloud.google.com/) and enable the Google Drive API.
+2. Configure the Google Auth platform and create an OAuth client with application type **Desktop app**.
+3. Download the client JSON file and keep it on your computer. Never commit it to GitHub or send it in chat.
+4. In the TelegramBackup wizard, enable **Google Drive Backup**, click **Browse**, and select the downloaded JSON file.
+5. Click **Connect & Test**. Your default browser opens for Google authorization; approve access using the Google account that owns the destination Drive.
+6. Optionally click **Create Drive Folder** to create a `TelegramBackup` folder automatically. You may leave the folder ID empty to use the Drive root.
+
 
 1. Double-click **`Launch_TelegramBackup.bat`**
 2. The **8-step wizard** opens
@@ -96,13 +108,13 @@ The token looks like this:
    - Step 4: Paste your **Chat/Group ID**
    - Step 5: Click ➕ Add Folder for each folder you want to back up
    - Step 6: Choose file types (or leave "All types" checked)
-   - Step 7: Configure autostart, background mode, tray options
+   - Step 7: Choose **Telegram Backup**, **Google Drive Backup**, or both; configure Google Drive and system options
    - Step 8: Review everything → click **Launch**
 4. Dashboard opens and backup starts automatically
 
 ---
 
-## Step 8 — Optional System Options
+## Optional System Options
 
 | Option | What it does | Recommended |
 |---|---|---|
@@ -115,10 +127,11 @@ The token looks like this:
 
 ## Testing Your Setup
 
-1. Start watching
-2. Copy any file into your watched folder
-3. Within 2-3 seconds, the file should appear in your Telegram group
-4. The caption shows: filename, date, size, and your machine ID
+1. Start watching.
+2. Copy any file into your watched folder.
+3. If Telegram Backup is enabled, the file should appear in your Telegram group within a few seconds.
+4. If Google Drive Backup is enabled, the file should appear in the selected Drive folder after the upload completes.
+5. The activity log shows the destination and whether the upload succeeded or was skipped as a duplicate.
 
 ---
 

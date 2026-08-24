@@ -4,6 +4,23 @@ All notable changes to this project are documented here.
 
 ---
 
+## [v4.0] — 2026-08-24
+
+### Added
+- Modern sidebar dashboard with destination cards, live health, current upload, queue, and speed summaries.
+- Destination-aware Activity & Queue page with retry, queue-only removal, and clear actions.
+- Shared token-bucket bandwidth limiter across Telegram and Google Drive, with unlimited, preset, and custom KB/s or MB/s values.
+- Safe global pause/resume without destroying pending queues.
+- Configurable file-stability checks and lightweight offline waiting with automatic resume.
+- Daily, session, and all-time statistics with rate-limited persistence.
+- General, reliability, and network settings with safe defaults and Windows notification preference.
+
+### Compatibility
+- Existing Telegram and Google Drive configuration, OAuth tokens, duplicate histories, watcher behavior, 50 MB Telegram limit, flood-wait handling, retry behavior, autostart, tray, and background mode remain in their original locations and formats.
+- New settings are optional and loaded with defaults; source files are never deleted by queue actions.
+
+---
+
 ## [v3.0] — 2026-03-14
 
 ### Added

@@ -10,19 +10,22 @@ with open("README.md", encoding="utf-8") as f:
 
 setup(
     name="telegrambackup",
-    version="3.0.0",
+    version="4.0.0",
     author="3ala",
-    description="Auto-backup any folder on your PC directly to a Telegram group or channel",
+    description="Auto-backup any folder on your PC to Telegram, Google Drive, or both",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/YOUR_USERNAME/TelegramBackup",
-    py_modules=["telegram_backup_v3"],
+    py_modules=["telegram_backup_v3", "drive_backup", "bandwidth"],
     python_requires=">=3.9",
     install_requires=[
         "python-telegram-bot>=21.0",
         "watchdog>=4.0.0",
         "pystray>=0.19.0",
         "Pillow>=10.0.0",
+        "google-api-python-client>=2.150.0",
+        "google-auth-httplib2>=0.2.0",
+        "google-auth-oauthlib>=1.2.0",
     ],
     entry_points={
         "console_scripts": [
@@ -42,7 +45,7 @@ setup(
         "Intended Audience :: End Users/Desktop",
         "Environment :: Win32 (MS Windows)",
     ],
-    keywords="telegram backup folder upload automation windows",
+    keywords="telegram google drive backup folder upload automation windows",
     project_urls={
         "Bug Reports": "https://github.com/YOUR_USERNAME/TelegramBackup/issues",
         "Source": "https://github.com/YOUR_USERNAME/TelegramBackup",

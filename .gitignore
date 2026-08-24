@@ -1,0 +1,24 @@
+# Local TelegramBackup configuration and history
+.tgbackup_*.json
+
+# Google OAuth credentials and local token cache
+credentials.json
+client_secret*.json
+token.json
+.tgbackup_v3_drive_token.json
+.tgbackup_v3_drive_history.json
+
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# PyInstaller/build output
+build/
+dist/
+*.spec
+
+# Local logs
+*.log
