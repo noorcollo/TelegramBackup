@@ -40,7 +40,7 @@ from collections import deque
 from bandwidth import BandwidthLimiter, ThrottledReader
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-from telegram import Bot
+from telegram import Bot, InputFile
 from telegram.error import TelegramError
 
 try:
@@ -316,10 +316,10 @@ class Uploader(threading.Thread):
                     t0=time.time()
                     with open(path,"rb") as doc:
                         throttled=ThrottledReader(doc,self.limiter,self.cancel_event)
-                        throttled.name=path
+                        upload_file=InputFile(throttled, filename=os.path.basename(path), read_file_handle=False)
                         self.on_item(path,"Telegram","Uploading",None,attempt-1)
                         await bot.send_document(
-                            chat_id=self.chat_id, document=throttled, caption=cap,
+                            chat_id=self.chat_id, document=upload_file, caption=cap,
                             parse_mode="Markdown",
                             read_timeout=90, write_timeout=90, connect_timeout=30)
                     elapsed=max(time.time()-t0, 0.1)
@@ -504,6 +504,7 @@ class App(tk.Tk):
         self.tray_icon=None; self._quitting=False
         self.cur_step=0; self.step_done=[False]*8
         self._active_tab="main"; self._log_lines=[]; self._log_filter=tk.StringVar(value="All"); self._log_search=tk.StringVar()
+        self.ui_events=queue.Queue(); self.log_lock=threading.Lock()
         has_telegram = self.v_telegram_enabled.get() and cfg.get("token") and cfg.get("chat_id")
         has_drive = self.v_drive_enabled.get() and cfg.get("drive_credentials")
         if (has_telegram or has_drive) and self.watch_folders:
@@ -513,7 +514,7 @@ class App(tk.Tk):
         self._build_layout()
         self.protocol("WM_DELETE_WINDOW",self._on_close)
         if self.cur_step==8: self.after(500,self._start_backup)
-        self._refresh_fc()
+        self._refresh_fc(); self.after(100,self._poll_ui_events)
 
     def _apply_theme(self):
         self.C=THEMES[self.theme_name.get()]; self.configure(bg=self.C["bg"])
@@ -1289,10 +1290,27 @@ class App(tk.Tk):
         previous=self.network_last; current=self._is_network_available()
         if previous is False and current is True: self._notify("Internet restored","The upload queue will resume automatically.")
         if previous is True and current is False: self._log("Offline — waiting for internet connection","warn")
-        if current != previous: self.after(0,lambda:self.v_health.set("Healthy" if current else "Warning"))
+        if current != previous: self._post_ui(self.v_health.set,"Healthy" if current else "Warning")
+
+    def _post_ui(self, callback, *args):
+        self.ui_events.put((callback,args))
+
+    def _poll_ui_events(self):
+        try:
+            for _ in range(100):
+                callback,args=self.ui_events.get_nowait(); callback(*args)
+        except queue.Empty:
+            pass
+        except tk.TclError:
+            return
+        try: self.after(100,self._poll_ui_events)
+        except tk.TclError: pass
 
     def _set_status(self, text):
-        self.after(0,lambda:self.v_status.set(("🟢  "+str(text))[:64]))
+        self._post_ui(self._set_status_ui,text)
+
+    def _set_status_ui(self,text):
+        self.v_status.set(("🟢  "+str(text))[:64])
 
     def _notify(self,title,message):
         if not self.v_notifications.get(): return
@@ -1303,7 +1321,7 @@ class App(tk.Tk):
     def _queue_key(self,path,destination): return f"{destination}::{path}"
 
     def _on_queue_item(self,path,destination,status,progress=0.0,retries=0):
-        self.after(0,lambda:self._queue_item_ui(path,destination,status,progress,retries))
+        self._post_ui(self._queue_item_ui,path,destination,status,progress,retries)
 
     def _queue_item_ui(self,path,destination,status,progress=0.0,retries=0):
         key=self._queue_key(path,destination); old=self.queue_items.get(key,{})
@@ -1451,22 +1469,29 @@ class App(tk.Tk):
         self._log(f"📤  Queued {count} file(s) to {len(self.sinks)} destination(s).","accent2")
 
     # ── Callbacks ─────────────────────────────────────────────────────────────
-    def _on_upload(self,n=1):
-        self.n_uploaded+=n; self.after(0,lambda:self.v_uploaded.set(str(self.n_uploaded)))
+    def _on_upload(self,n=1): self._post_ui(self._upload_ui,n)
 
-    def _on_skip(self,reason):
-        self.n_skipped+=1; self.stats.record_skip(); self.after(0,lambda:self.v_skipped.set(str(self.n_skipped)))
-        if reason=="size": self.n_size+=1; self.after(0,lambda:self.v_size_skip.set(str(self.n_size)))
-        elif reason=="error": self.n_err+=1; self.stats.record_error(); self.after(0,lambda:self.v_err_skip.set(str(self.n_err)))
-        elif reason=="dup": self.n_dup+=1; self.after(0,lambda:self.v_dup_skip.set(str(self.n_dup)))
+    def _upload_ui(self,n=1):
+        self.n_uploaded+=n; self.v_uploaded.set(str(self.n_uploaded))
 
-    def _on_speed(self,bps):
-        self.speed_hist.append(float(bps or 0))
+    def _on_skip(self,reason): self._post_ui(self._skip_ui,reason)
+
+    def _skip_ui(self,reason):
+        self.n_skipped+=1; self.stats.record_skip(); self.v_skipped.set(str(self.n_skipped))
+        if reason=="size": self.n_size+=1; self.v_size_skip.set(str(self.n_size))
+        elif reason=="error": self.n_err+=1; self.stats.record_error(); self.v_err_skip.set(str(self.n_err))
+        elif reason=="dup": self.n_dup+=1; self.v_dup_skip.set(str(self.n_dup))
+
+    def _on_speed(self,bps): self._post_ui(self._speed_ui,float(bps or 0))
+
+    def _speed_ui(self,bps):
+        self.speed_hist.append(bps)
         avg=sum(self.speed_hist)/max(1,len(self.speed_hist)); peak=max(self.speed_hist or [0])
         lbl=f"{bps/1024:.1f} KB/s" if bps<1048576 else f"{bps/1048576:.2f} MB/s"
         albl=format_bytes(avg)+"/s"; plbl=format_bytes(peak)+"/s"
-        self.after(0,lambda:(self.v_speed.set(lbl),self.v_avg_speed.set(albl),self.v_peak_speed.set(plbl),self.v_summary.set(f"Destination: {self.v_destination.get()}    Queue: {self.v_queue.get()}    Speed: {lbl}    Health: {self.v_health.get()}")))
-        if hasattr(self,"graph") and self.graph.winfo_exists(): self.after(0,lambda:self.graph.push(bps))
+        self.v_speed.set(lbl); self.v_avg_speed.set(albl); self.v_peak_speed.set(plbl)
+        self.v_summary.set(f"Destination: {self.v_destination.get()}    Queue: {self.v_queue.get()}    Speed: {lbl}    Health: {self.v_health.get()}")
+        if hasattr(self,"graph") and self.graph.winfo_exists(): self.graph.push(bps)
 
     # ── File count ────────────────────────────────────────────────────────────
     def _update_fc(self):
@@ -1531,21 +1556,29 @@ class App(tk.Tk):
 
     # ── Log helpers ───────────────────────────────────────────────────────────
     def _log(self,msg,tag="text"):
-        ts=datetime.now().strftime("%H:%M:%S"); self._log_lines.append((ts,msg,tag))
-        if len(self._log_lines)>500: self._log_lines=self._log_lines[-500:]
-        def _do():
-            if not hasattr(self,"log_box") or not self.log_box.winfo_exists(): return
-            self.log_box.config(state="normal")
-            self.log_box.insert("end",f"[{ts}] ","sub"); self.log_box.insert("end",f"{msg}\n",tag)
-            self.log_box.see("end"); self.log_box.config(state="disabled")
-        self.after(0,_do)
+        ts=datetime.now().strftime("%H:%M:%S")
+        with self.log_lock:
+            self._log_lines.append((ts,msg,tag))
+            if len(self._log_lines)>500: self._log_lines=self._log_lines[-500:]
+        self._post_ui(self._append_log_ui,ts,msg,tag)
+
+    def _append_log_ui(self,ts,msg,tag):
+        if not hasattr(self,"log_box") or not self.log_box.winfo_exists(): return
+        # Re-render filtered activity only when a filter is active; otherwise
+        # append one line to keep UI redraws cheap.
+        if self._log_search.get().strip() or self._log_filter.get()!="All":
+            self._repopulate_log(); return
+        self.log_box.config(state="normal")
+        self.log_box.insert("end",f"[{ts}] ","sub"); self.log_box.insert("end",f"{msg}\n",tag)
+        self.log_box.see("end"); self.log_box.config(state="disabled")
 
     def _repopulate_log(self):
         if not hasattr(self,"log_box") or not self.log_box.winfo_exists(): return
         self.log_box.config(state="normal"); self.log_box.delete("1.0","end")
         query=self._log_search.get().strip().lower(); severity=self._log_filter.get()
         allowed={"Info":"sub","Success":"done","Warning":"warn","Error":"err"}
-        for ts,msg,tag in self._log_lines[-200:]:
+        with self.log_lock: lines=list(self._log_lines[-200:])
+        for ts,msg,tag in lines:
             if query and query not in msg.lower(): continue
             if severity!="All" and tag!=allowed.get(severity): continue
             self.log_box.insert("end",f"[{ts}] ","sub"); self.log_box.insert("end",f"{msg}\n",tag)
@@ -1564,7 +1597,7 @@ class App(tk.Tk):
         except OSError as exc: self._log(f"Could not export log: {exc}","err")
 
     def _clear_log(self):
-        self._log_lines=[]
+        with self.log_lock: self._log_lines=[]
         if hasattr(self,"log_box") and self.log_box.winfo_exists():
             self.log_box.config(state="normal"); self.log_box.delete("1.0","end"); self.log_box.config(state="disabled")
 

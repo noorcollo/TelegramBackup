@@ -1,3 +1,4 @@
+import io
 import os
 import sys
 import tempfile
@@ -8,6 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bandwidth import BandwidthLimiter, ThrottledReader
+from telegram import InputFile
 from telegram_backup_v3 import FolderWatcher, format_limit, parse_limit
 
 
@@ -29,10 +31,13 @@ def test_bandwidth_and_parsing():
         handle.write(b"x" * 128 * 1024)
         path = handle.name
     try:
-        limiter = BandwidthLimiter(256 * 1024)
+        limiter = BandwidthLimiter(128 * 1024)
         with open(path, "rb") as raw:
             reader = ThrottledReader(raw, limiter, threading.Event())
             assert len(reader.read()) == 128 * 1024
+        stream = ThrottledReader(io.BytesIO(b"abc"), BandwidthLimiter(128 * 1024), threading.Event())
+        upload_file = InputFile(stream, filename="sample.bin", read_file_handle=False)
+        assert upload_file.filename == "sample.bin"
     finally:
         os.unlink(path)
 

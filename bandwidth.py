@@ -75,15 +75,16 @@ class BandwidthLimiter:
     def acquire(self, amount: int, cancel_event: Optional[threading.Event] = None) -> bool:
         """Wait for permission to transfer ``amount`` bytes.
 
-        Returns ``False`` when cancellation is requested or the limiter is
-        stopped. Pausing intentionally leaves the queue and current stream
-        intact; reads simply wait until resumed.
+        Requests larger than the bucket capacity are consumed in bounded
+        portions. This is important for low limits such as 128 KB/s: a 256 KB
+        network read must not wait forever for a bucket that can hold only
+        128 KB.
         """
-        amount = max(0, int(amount or 0))
-        if amount == 0:
+        remaining = max(0, int(amount or 0))
+        if remaining == 0:
             return True
         with self._condition:
-            while True:
+            while remaining > 0:
                 if self._stopped or (cancel_event and cancel_event.is_set()):
                     return False
                 if self._paused:
@@ -92,11 +93,14 @@ class BandwidthLimiter:
                 if not self._limit:
                     return True
                 self._refill_locked()
-                if self._tokens >= amount:
-                    self._tokens -= amount
-                    return True
-                wait_for = max(0.01, min(0.5, (amount - self._tokens) / self._limit))
+                portion = min(remaining, max(1, int(self._capacity)))
+                if self._tokens >= portion:
+                    self._tokens -= portion
+                    remaining -= portion
+                    continue
+                wait_for = max(0.01, min(0.5, (portion - self._tokens) / self._limit))
                 self._condition.wait(wait_for)
+        return True
 
 
 class ThrottledReader:
