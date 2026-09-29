@@ -267,7 +267,6 @@ class DriveUploader(threading.Thread):
                                 "warn",
                             )
                             self.on_item(path, "Google Drive", "Retrying", 0.0, attempt)
-                            import time
                             time.sleep(2 ** attempt)
                 if not success and self.active:
                     self.on_item(path, "Google Drive", "Error", 0.0, self.max_retries)

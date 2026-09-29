@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 
 ---
 
+## [v4.0.1] — 2026-09-29
+
+### Fixed
+- Google Drive retry handling no longer shadows the module-level `time` import, preventing the worker from failing with `cannot access local variable 'time'`.
+
+### Security
+- No credentials, OAuth files, bot tokens, or local history files are included in the commit.
+
+---
+
 ## [v4.0] — 2026-08-24
 
 ### Added
