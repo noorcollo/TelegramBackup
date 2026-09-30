@@ -1,0 +1,72 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-exe:
+    name: Build TelegramBackup.exe
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies and PyInstaller
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pyinstaller
+
+      - name: Compile-check Python sources
+        shell: pwsh
+        run: |
+          python -m py_compile telegram_backup_v3.py drive_backup.py bandwidth.py
+
+      - name: Build one-file Windows executable
+        shell: pwsh
+        run: |
+          python -m PyInstaller --noconfirm --clean --onefile --windowed `
+            --name TelegramBackup `
+            --hidden-import=telegram `
+            --hidden-import=watchdog.observers `
+            --hidden-import=pystray._win32 `
+            --collect-all telegram `
+            --collect-all watchdog `
+            --collect-all pystray `
+            --collect-all PIL `
+            --hidden-import=drive_backup `
+            --collect-all googleapiclient `
+            --collect-all google_auth_oauthlib `
+            telegram_backup_v3.py
+
+      - name: Create SHA-256 checksum
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash dist/TelegramBackup.exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  TelegramBackup.exe" | Out-File -FilePath dist/SHA256SUMS.txt -Encoding ascii
+          Get-Content dist/SHA256SUMS.txt
+
+      - name: Upload Windows EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TelegramBackup-Windows-${{ github.sha }}
+          path: |
+            dist/TelegramBackup.exe
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14

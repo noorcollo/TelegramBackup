@@ -70,6 +70,10 @@
 
 ## 🚀 Quick Start
 
+### Automatic Windows EXE build
+
+GitHub Actions builds a real Windows executable automatically after every push to `main`. Open the [Build Windows EXE workflow](../../actions/workflows/build-windows-exe.yml), select the latest successful run, and download its artifact. The artifact includes `TelegramBackup.exe` and a SHA-256 checksum. See [Automatic Windows EXE Builds](docs/WINDOWS_BUILD.md) for details.
+
 ### Option A — Run with Python (Recommended)
 
 **1. Install Python 3.9+**  
