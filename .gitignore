@@ -19,6 +19,7 @@ venv/
 build/
 dist/
 *.spec
+rust-port/target/
 
 # Local logs
 *.log

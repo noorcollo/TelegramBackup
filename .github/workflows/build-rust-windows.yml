@@ -1,0 +1,43 @@
+name: Build Rust Windows EXE
+
+on:
+  push:
+    branches: [rust-port]
+    paths:
+      - "rust-port/**"
+      - ".github/workflows/build-rust-windows.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "rust-port/**"
+      - ".github/workflows/build-rust-windows.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Test Rust port
+        working-directory: rust-port
+        run: cargo test --locked
+      - name: Build native Windows executable
+        working-directory: rust-port
+        run: cargo build --release --locked
+      - name: Package executable and checksum
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item rust-port/target/release/telegram-backup-rs.exe dist/TelegramBackup-Rust.exe
+          $hash = (Get-FileHash dist/TelegramBackup-Rust.exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  TelegramBackup-Rust.exe" | Set-Content dist/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TelegramBackup-Rust-Windows-${{ github.sha }}
+          path: dist/*
+          retention-days: 14
